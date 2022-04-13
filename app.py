@@ -8,6 +8,7 @@ from dash.dependencies import Input, Output, State
 from dash import dcc
 from dash import html
 from dash import dash_table
+from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 
 import pandas as pd
@@ -17,12 +18,8 @@ from sklearn.preprocessing import StandardScaler
 from clustering_interpretation import ClusteringInterpretation
 from report import InterpretationReport
 
-external_stylesheets = ["https://codepen.io/chriddyp/pen/bWLwgP.css"]
-
-app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
+app = dash.Dash(external_stylesheets=[dbc.themes.MINTY])
 server = app.server
-
-colors = {"graphBackground": "#F5F5F5", "background": "#ffffff", "text": "#000000"}
 
 data = pd.DataFrame()
 interpretation_df = None
@@ -32,60 +29,57 @@ interpretation_report = InterpretationReport(buffer)
 app.layout = html.Div(
     [
         html.H1("РЕЗУЛЬТАТЫ ИНТЕРПРЕТАЦИИ", style={'text-align': 'center'}),
-        html.Div(id="load", children=[
-            html.Div(id="upload", children=[
+        dbc.Row([
+            dbc.Col([
                 dcc.Upload(
                     id="upload_data",
                     children=html.Div(["Перетащите или ", html.A("Выберите файл")]),
                     style={
                         "width": "100%",
-                        "height": "60px",
+                        "height": "100%",
                         "lineHeight": "60px",
                         "borderWidth": "1px",
                         "borderStyle": "dashed",
                         "textAlign": "center",
                         "margin-bottom": "10px",
                     },
-                    # Allow multiple files to be uploaded
-                    multiple=True,
-                )], style=dict(width='90%', display='inline-block')),
-            html.Div(id="download", children=[
-                html.Button("Скачать PDF", id="btn_pdf",
-                            disabled=True,
-                            n_clicks=0,
-                            style={
-                                "width": "200px",
-                                "height": "60px",
-                                "margin-left": "10px"
-                            }),
+                    multiple=True
+                ),
+            ]),
+            dbc.Col([
+                dbc.Button(
+                    "Скачать PDF",
+                    id="btn_pdf",
+                    disabled=True,
+                    n_clicks=0,
+                    style={
+                        "width": "100%",
+                    },
+                    color="info"
+                ),
                 dcc.Download(id="download_report_pdf"),
-            ], style=dict(width='14%', display='inline-block')),
-        ], style=dict(display='flex')),
+            ], width=1)
+        ]),
 
-        html.Div(id='dataset_info', children=[
-            html.Div(id='continuous_info', children=[
-                html.Label('Непрерывные'),
+        dbc.Row([
+            dbc.Col([
+                dbc.Label('Непрерывные'),
                 dcc.Dropdown(
                     id='continuous',
                     clearable=False,
                     searchable=False,
                     multi=True,
-                    style={
-                        "width": "100%"
-                    }
-                )], style=dict(width='35%')),
-            html.Div(id='categorical_info', children=[
-                html.Label('Категориальные'),
+                )
+            ]),
+            dbc.Col([
+                dbc.Label('Категориальные'),
                 dcc.Dropdown(
                     id='categorical',
                     clearable=False,
                     searchable=False,
                     multi=True,
-                    style={
-                        "width": "100%"
-                    }
                 ),
-                html.Button(
+                dbc.Button(
                     'ПОДТВЕРДИТЬ',
                     id='submit_button',
                     n_clicks=0,
@@ -98,77 +92,68 @@ app.layout = html.Div(
                 dbc.Tooltip(
                     f"Если вся информация указана верно, то нажмите подтвердить, "
                     f"иначе внесите изменения и подтвердите их.",
-                    target=f"submit_button",
-                    placement="top",
+                    target="submit_button",
+                    placement="bottom",
                 ),
-            ], style={"width": "35%", "margin-left": "30px"}),
-            html.Div(id='clusters_info', children=[
-                html.Label('Кластеры'),
+            ]),
+            dbc.Col([
+                dbc.Label('Кластеры'),
                 dcc.Dropdown(
                     id='clusters',
                     clearable=False,
                     searchable=False,
                     multi=True,
-                    style={
-                        "width": "100%"
-                    }
-                )], style={"width": "10%", "margin-left": "30px"}),
-            html.Div(id='dependent_info', children=[
-                html.Label('Являются ли сравниваемые группы зависимыми?'),
-                dcc.RadioItems(
+                )
+            ]),
+            dbc.Col([
+                dbc.Label('Являются ли сравниваемые группы зависимыми?'),
+                dbc.RadioItems(
                     id="dependent",
                     options=[
                         {'label': 'Да', 'value': 'True'},
                         {'label': 'Нет', 'value': 'False'},
                     ],
                     value='False',
-                    style={
-                        "width": "100%"
-                    },
-                    labelStyle={'display': 'inline-block'}
+                    inline=True,
                 ),
                 dbc.Tooltip(
                     f"Например, если измерения признаков производились несколько раз у пациентов. "
                     f"(Уровень сахара в крови/вес/давление)",
-                    target=f"dependent",
-                    placement="auto-end",
-                )], style={"width": "20%", "margin-left": "40px"}),
-        ], style={"display": 'flex'}),
+                    target="dependent",
+                    placement="bottom",
 
-        html.Div(id='mode', children=[
-            html.Label('Режим аналитики:'),
-            dcc.Dropdown(
-                id='set_mode',
-                value='None',
-                clearable=False,
-                searchable=False,
-                multi=False,
-                style={"textAlign": "center"}
-            ),
+                )
+            ]),
         ]),
 
+        dbc.Row([
+            dbc.Col([
+                dbc.Label('Режим аналитики:'),
+                dcc.Dropdown(
+                    id='set_mode',
+                    value='None',
+                    clearable=False,
+                    searchable=False,
+                    multi=False,
+                    style={"textAlign": "center"}
+                ),
+            ])
+        ]),
+        html.Br(),
         html.Div(id="main_table"),
-
-        html.Div(id="why", children=[
-            dcc.Textarea(
-                id='ask_textarea',
-                value='Здесь вы можете спросить: почему пациент с ID: _  в кластере: _ или '
-                      'почему пациент с ID: _  не в кластере: _',
-                style={'width': '90%', 'height': "60px", "margin-top": "10px"},
-            ),
-            html.Button('Спросить', id='ask_button',
-                        n_clicks=0,
-                        disabled=True,
-                        style={
-                            'width': '200px',
-                            'height': "65px",
-                            "margin-left": "10px",
-                            "margin-top": "10px",
-                            "textAlign": "center",
-                        }
-                        ),
-        ], style={"display": "flex"}),
-
+        html.Br(),
+        dbc.Row([
+            dbc.Col([
+                dbc.InputGroup([
+                    dbc.Textarea(id='ask_textarea',
+                                 placeholder='Здесь вы можете спросить: почему пациент с ID: _  в кластере: _ или '
+                                             'почему пациент с ID: _  не в кластере: _'
+                                 ),
+                    dbc.Button("Спросить", id="ask_button", n_clicks=0),
+                ])
+            ])
+        ]),
+        html.Br(),
         html.Div(id="plots"),
         html.Div(id="significant_features_table")
     ]
@@ -328,15 +313,11 @@ def create_interpretation_df(continuous: list, categorical: list, clusters: str,
     ],
 )
 def update_dropdowns_automatically(contents, filename):
-    clear()
-
-    global data
-
-    options = [{'label': column, 'value': column} for column in [""]]
-    values = {"Continuous": "", "Categorical": "", "Clusters": ""}
-    disabled = True
-
     if contents:
+        clear()
+
+        global data
+
         contents = contents[0]
         filename = filename[0]
         interpretation_report.set_file_name(filename)
@@ -346,12 +327,14 @@ def update_dropdowns_automatically(contents, filename):
         values = distribute_features_automatically(df)
         disabled = False
 
-    return [
+        return [
             options, values["Continuous"],
             options, values["Categorical"],
             options, values["Clusters"],
             disabled
-    ]
+        ]
+
+    raise PreventUpdate
 
 
 @app.callback(
@@ -363,14 +346,13 @@ def update_dropdowns_automatically(contents, filename):
     State('clusters', 'value')
 )
 def update_mode(n_clicks, clusters):
-    options = [{"label": "Все кластеры", "value": "None"}]
     if n_clicks > 0:
         clusters = clusters[-1]
         options = [{"label": "Кластер %s" % clstr, "value": clstr} for clstr in data[clusters].unique()]
         options.append({"label": "Все кластеры", "value": "all"})
         return options, "all"
 
-    return options, "None"
+    raise PreventUpdate
 
 
 @app.callback(
